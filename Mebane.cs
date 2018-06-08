@@ -43,6 +43,7 @@ namespace QuantConnect.Algorithm.CSharp
         private const int HS = 200;                             //history span
         private const int WD1 = 61;                              //days of window1
         private const int WD2 = 20;                              //days of window2
+        private const decimal MIN_PCT_DIFF = 0.1M;
 
         private readonly Dictionary<Symbol, SymbolData> _sd = new Dictionary<Symbol, SymbolData>();      //portfolio corresponding dic
 
@@ -60,12 +61,13 @@ namespace QuantConnect.Algorithm.CSharp
 
             Schedule.On(DateRules.EveryDay(), TimeRules.At(9, 35), () =>
             {
-                List<decimal> ranks = new List<decimal>();
+                List<SymbolData> ranks = new List<SymbolData>();
                 int i = 0;
+                Boolean ready = true;
 
                 foreach (var val in _sd.Values)
                 {
-                    var tradeBarHistory = History<TradeBar>(val.Symbol, TimeSpan.FromDays(HS));
+                    var tradeBarHistory = History<TradeBar>(val.Symbol, TimeSpan.FromDays(HS), Resolution.Daily);
                     
                     foreach (TradeBar tradeBar in tradeBarHistory)
                     {
@@ -75,22 +77,23 @@ namespace QuantConnect.Algorithm.CSharp
                     }
                     var tmp = tradeBarHistory.ElementAt(i - 1).Close - tradeBarHistory.ElementAt(i - 1 - WD1).Close;
                     val.Return = tmp;
-                    ranks.Add(tmp);
+                    ranks.Add(val);
+                    ready = val.IsReady;
                 }
 
-                ranks.Sort(delegate (decimal x, decimal y) { return y.CompareTo(x); });
-                decimal threshold = ranks.ElementAt(TOP_K - 1);
-                i = 0;
+                if (!ready)
+                    return;
+ 
+                ranks.Sort(delegate (SymbolData x, SymbolData y) { return y.CompareTo(x); });
 
-                foreach (var val in _sd.Values)
+                for (i = 0; i < ranks.Count; i++)
                 {
-                    if (i < TOP_K && val.Return > threshold && val.SSma - val.LSma > 0)
+                    if (i < TOP_K && ranks.ElementAt(i).SSma - ranks.ElementAt(i).LSma > 0)
                     {
-                        val.wt = LEVERAGE / TOP_K;
-                        i++;
+                        ranks.ElementAt(i).wt = LEVERAGE / TOP_K;
                     }
                     else
-                        val.wt = 0;
+                        ranks.ElementAt(i).wt = 0;
                 }
 
                 reweight();
@@ -102,9 +105,9 @@ namespace QuantConnect.Algorithm.CSharp
             _sd.Clear();
 
             //Add individual stocks.
-            AddEquity("AAPL", Resolution.Daily, Market.USA);
-            AddEquity("IBM", Resolution.Daily, Market.USA);
-            AddEquity("INTC", Resolution.Daily, Market.USA);
+            AddEquity("AAPL", Resolution.Second, Market.USA);
+            AddEquity("IBM", Resolution.Second, Market.USA);
+            AddEquity("INTC", Resolution.Second, Market.USA);
 
             foreach (var security in Securities)
             {
@@ -115,16 +118,24 @@ namespace QuantConnect.Algorithm.CSharp
         private void reweight()
         {
             decimal liquidity = Portfolio.TotalHoldingsValue + Portfolio.Cash;
-            double pct_diff = 0;
+            decimal pct_diff = 0;
 
             foreach (var val in _sd.Values)
             {
-                int target = liquidity * val.wt / val.Security.
+                decimal target = liquidity * val.wt / val.Security.High;
+                decimal current = Portfolio[val.Symbol].Quantity;
+                val.orders = target - current;
+                pct_diff += val.orders * val.Security.High / liquidity;
             }
 
-
-
-    }
+            if (pct_diff > MIN_PCT_DIFF)
+            {
+                foreach (var val in _sd.Values)
+                {
+                    MarketOrder(val.Symbol, val.orders);
+                }
+            }
+        }
 
         class SymbolData
         {
@@ -141,7 +152,7 @@ namespace QuantConnect.Algorithm.CSharp
             public readonly Identity Close;
             public decimal Return;
             public decimal wt;
-            public int orders;
+            public decimal orders;
 
            private readonly Mebane _algorithm;
 
@@ -160,21 +171,6 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 get { return Close.IsReady && LSma.IsReady & LSma.IsReady; }
             }
-
-            public void Update()
-            {
-                //reset LastFillPrice
-                if ((int)(Security.Holdings.Quantity) == 0)
-                    LastFillPrice = -1;
-
-                OrderTicket ticket;                             //enter ticket
-                List<int> idlist;                                //force-quit id list
-
-                TryForceQuit(out idlist);                   //止损
-                TryExit(out idlist);                        //退出
-                TryEnter(out ticket);                       //入市
-            }
-
         }
     }
 
