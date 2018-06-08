@@ -3,10 +3,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Collections;
 
 using QuantConnect.Securities.Equity;
 using QuantConnect.Indicators;
 using QuantConnect.Securities;
+using QuantConnect.Data;
+using QuantConnect.Data.Market;
 
 //Mebane Faber Relative Strength Strategy with MA Rule
 //This is a synthesis of two methods
@@ -55,17 +58,43 @@ namespace QuantConnect.Algorithm.CSharp
             //select stocks to be traded.
             stockSelection();
 
-            Schedule.On(DateRules.EveryDay(), TimeRules.At(9, 32, ), () =>
-            foreach (var val in _sd.Values)
+            Schedule.On(DateRules.EveryDay(), TimeRules.At(9, 35), () =>
             {
-                Schedule.On(DateRules.EveryDay(val.Symbol), TimeRules.AfterMarketOpen(val.Symbol), () =>
+                List<decimal> ranks = new List<decimal>();
+                int i = 0;
+
+                foreach (var val in _sd.Values)
                 {
-                    Debug("EveryDay." + val.Symbol.ToString() + " initialize at: " + Time);
-                    Transactions.CancelOpenOrders(val.Symbol);                  //close all open orders at the daily beginning
-                });
-            }
+                    var tradeBarHistory = History<TradeBar>(val.Symbol, TimeSpan.FromDays(HS));
+                    
+                    foreach (TradeBar tradeBar in tradeBarHistory)
+                    {
+                        val.LSma.Update(tradeBar.EndTime, tradeBar.Close);
+                        val.SSma.Update(tradeBar.EndTime, tradeBar.Close);
+                        i++;
+                    }
+                    var tmp = tradeBarHistory.ElementAt(i - 1).Close - tradeBarHistory.ElementAt(i - 1 - WD1).Close;
+                    val.Return = tmp;
+                    ranks.Add(tmp);
+                }
 
+                ranks.Sort(delegate (decimal x, decimal y) { return y.CompareTo(x); });
+                decimal threshold = ranks.ElementAt(TOP_K - 1);
+                i = 0;
 
+                foreach (var val in _sd.Values)
+                {
+                    if (i < TOP_K && val.Return > threshold && val.SSma - val.LSma > 0)
+                    {
+                        val.wt = LEVERAGE / TOP_K;
+                        i++;
+                    }
+                    else
+                        val.wt = 0;
+                }
+
+                reweight();
+            });
         }
 
         private void stockSelection()
@@ -83,6 +112,20 @@ namespace QuantConnect.Algorithm.CSharp
             }
         }
 
+        private void reweight()
+        {
+            decimal liquidity = Portfolio.TotalHoldingsValue + Portfolio.Cash;
+            double pct_diff = 0;
+
+            foreach (var val in _sd.Values)
+            {
+                int target = liquidity * val.wt / val.Security.
+            }
+
+
+
+    }
+
         class SymbolData
         {
             public readonly Symbol Symbol;
@@ -93,11 +136,14 @@ namespace QuantConnect.Algorithm.CSharp
                 get { return Security.Holdings.Quantity; }
             }
 
-            public readonly SimpleMovingAverage LSma;
-            public readonly SimpleMovingAverage SSma;
+            public SimpleMovingAverage LSma;
+            public SimpleMovingAverage SSma;
             public readonly Identity Close;
+            public decimal Return;
+            public decimal wt;
+            public int orders;
 
-            private readonly Mebane _algorithm;
+           private readonly Mebane _algorithm;
 
             public SymbolData(Symbol symbol, Mebane algorithm)
             {
