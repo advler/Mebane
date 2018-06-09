@@ -61,6 +61,8 @@ namespace QuantConnect.Algorithm.CSharp
 
             Schedule.On(DateRules.EveryDay(), TimeRules.At(9, 35), () =>
             {
+                if (IsWarmingUp) return;
+
                 List<SymbolData> ranks = new List<SymbolData>();
                 int i = 0;
                 Boolean ready = true;
@@ -98,6 +100,8 @@ namespace QuantConnect.Algorithm.CSharp
 
                 reweight();
             });
+
+            SetWarmup(TimeSpan.FromDays(HS));
         }
 
         private void stockSelection()
@@ -106,8 +110,10 @@ namespace QuantConnect.Algorithm.CSharp
 
             //Add individual stocks.
             AddEquity("AAPL", Resolution.Second, Market.USA);
-            AddEquity("IBM", Resolution.Second, Market.USA);
+            AddEquity("MSFT", Resolution.Second, Market.USA);
             AddEquity("INTC", Resolution.Second, Market.USA);
+            AddEquity("AMZN", Resolution.Second, Market.USA);
+            AddEquity("GOOGL", Resolution.Second, Market.USA);
 
             foreach (var security in Securities)
             {
@@ -137,7 +143,7 @@ namespace QuantConnect.Algorithm.CSharp
             }
         }
 
-        class SymbolData
+        class SymbolData : IComparable
         {
             public readonly Symbol Symbol;
             public readonly Security Security;
@@ -161,6 +167,7 @@ namespace QuantConnect.Algorithm.CSharp
                 Symbol = symbol;
                 Security = algorithm.Securities[symbol];
 
+                Close = algorithm.Identity(symbol);
                 LSma = new SimpleMovingAverage(HS);
                 SSma = new SimpleMovingAverage(WD2);
 
@@ -171,8 +178,17 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 get { return Close.IsReady && LSma.IsReady & LSma.IsReady; }
             }
+
+            public int CompareTo(object obj)
+            {
+                if (obj == null) return 1;
+
+                SymbolData other = obj as SymbolData;
+                if (other != null)
+                    return this.Return.CompareTo(other.Return);
+                else
+                    throw new ArgumentException("Object is not a SymbolData");
+            }
         }
     }
-
-   
 }
