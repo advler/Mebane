@@ -40,9 +40,12 @@ namespace QuantConnect.Algorithm.CSharp
         private const decimal TOTALCASH = 10000;                //总资金
         private const decimal LEVERAGE = 1.0M;
         private const int TOP_K = 3;
-        private const int HS = 200;                             //history span
-        private const int WD1 = 61;                              //days of window1
-        private const int WD2 = 20;                              //days of window2
+        //private const int HS = 200;                             //history span
+        //private const int WD1 = 61;                              //days of window1
+        //private const int WD2 = 20;                              //days of window2
+        private const int HS = 2;                             //history span
+        private const int WD1 = 1;                              //days of window1
+        private const int WD2 = 1;                              //days of window2
         private const decimal MIN_PCT_DIFF = 0.1M;
 
         private readonly Dictionary<Symbol, SymbolData> _sd = new Dictionary<Symbol, SymbolData>();      //portfolio corresponding dic
@@ -50,8 +53,8 @@ namespace QuantConnect.Algorithm.CSharp
         public override void Initialize()
         {
             //set trade period
-            SetStartDate(2010, 01, 01);  //Set Start Date
-            SetEndDate(2018, 05, 01);    //Set End Date
+            SetStartDate(2013, 10, 10);  //Set Start Date
+            SetEndDate(2013, 10, 11);    //Set End Date
 
             //设置总资金
             SetCash(TOTALCASH);             //Set Strategy Cash
@@ -61,10 +64,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             Schedule.On(DateRules.EveryDay(), TimeRules.At(9, 35), () =>
             {
-                if (IsWarmingUp) return;
-
                 List<SymbolData> ranks = new List<SymbolData>();
-                int i = 0;
                 Boolean ready = true;
 
                 foreach (var val in _sd.Values)
@@ -75,9 +75,8 @@ namespace QuantConnect.Algorithm.CSharp
                     {
                         val.LSma.Update(tradeBar.EndTime, tradeBar.Close);
                         val.SSma.Update(tradeBar.EndTime, tradeBar.Close);
-                        i++;
                     }
-                    var tmp = tradeBarHistory.ElementAt(i - 1).Close - tradeBarHistory.ElementAt(i - 1 - WD1).Close;
+                    var tmp = tradeBarHistory.ElementAt(HS - 1).Close - tradeBarHistory.ElementAt(HS - 1 - WD1).Close;
                     val.Return = tmp;
                     ranks.Add(val);
                     ready = val.IsReady;
@@ -88,7 +87,7 @@ namespace QuantConnect.Algorithm.CSharp
  
                 ranks.Sort(delegate (SymbolData x, SymbolData y) { return y.CompareTo(x); });
 
-                for (i = 0; i < ranks.Count; i++)
+                for (int i = 0; i < ranks.Count; i++)
                 {
                     if (i < TOP_K && ranks.ElementAt(i).SSma - ranks.ElementAt(i).LSma > 0)
                     {
@@ -99,9 +98,9 @@ namespace QuantConnect.Algorithm.CSharp
                 }
 
                 reweight();
-            });
 
-            SetWarmup(TimeSpan.FromDays(HS));
+ //               SetWarmup(TimeSpan.FromDays(HS));
+            });
         }
 
         private void stockSelection()
@@ -109,11 +108,14 @@ namespace QuantConnect.Algorithm.CSharp
             _sd.Clear();
 
             //Add individual stocks.
-            AddEquity("AAPL", Resolution.Second, Market.USA);
-            AddEquity("MSFT", Resolution.Second, Market.USA);
-            AddEquity("INTC", Resolution.Second, Market.USA);
-            AddEquity("AMZN", Resolution.Second, Market.USA);
-            AddEquity("GOOGL", Resolution.Second, Market.USA);
+            //AddEquity("AAPL", Resolution.Second, Market.USA);
+            //AddEquity("MSFT", Resolution.Second, Market.USA);
+            //AddEquity("INTC", Resolution.Second, Market.USA);
+            //AddEquity("AMZN", Resolution.Second, Market.USA);
+            //AddEquity("GOOGL", Resolution.Second, Market.USA);
+            AddEquity("SPY", Resolution.Second, Market.USA);
+            AddEquity("IBM", Resolution.Second, Market.USA);
+            AddEquity("BAC", Resolution.Second, Market.USA);
 
             foreach (var security in Securities)
             {
