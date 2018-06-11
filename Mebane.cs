@@ -40,12 +40,12 @@ namespace QuantConnect.Algorithm.CSharp
         private const decimal TOTALCASH = 10000;                //总资金
         private const decimal LEVERAGE = 1.0M;
         private const int TOP_K = 3;
-        //private const int HS = 200;                             //history span
-        //private const int WD1 = 61;                              //days of window1
-        //private const int WD2 = 20;                              //days of window2
-        private const int HS = 2;                             //history span
-        private const int WD1 = 1;                              //days of window1
-        private const int WD2 = 1;                              //days of window2
+        private const int HS = 280;                             //history span
+        private const int WD1 = 61;                              //days of window1
+        private const int WD2 = 20;                              //days of window2
+        //private const int HS = 2;                             //history span
+        //private const int WD1 = 1;                              //days of window1
+        //private const int WD2 = 1;                              //days of window2
         private const decimal MIN_PCT_DIFF = 0.1M;
 
         private readonly Dictionary<Symbol, SymbolData> _sd = new Dictionary<Symbol, SymbolData>();      //portfolio corresponding dic
@@ -53,8 +53,8 @@ namespace QuantConnect.Algorithm.CSharp
         public override void Initialize()
         {
             //set trade period
-            SetStartDate(2013, 10, 10);  //Set Start Date
-            SetEndDate(2013, 10, 11);    //Set End Date
+            SetStartDate(2009, 5, 31);  //Set Start Date
+            SetEndDate(2018, 5, 31);    //Set End Date
 
             //设置总资金
             SetCash(TOTALCASH);             //Set Strategy Cash
@@ -66,17 +66,48 @@ namespace QuantConnect.Algorithm.CSharp
             {
                 List<SymbolData> ranks = new List<SymbolData>();
                 Boolean ready = true;
+                decimal tmp = 0;
 
                 foreach (var val in _sd.Values)
                 {
                     var tradeBarHistory = History<TradeBar>(val.Symbol, TimeSpan.FromDays(HS), Resolution.Daily);
-                    
+
+                    //Calculate LSma
                     foreach (TradeBar tradeBar in tradeBarHistory)
+                        tmp = tmp + tradeBar.Close;
+                    if (tradeBarHistory.Count() > 0)
+                        val.LSma = tmp / tradeBarHistory.Count();
+                    else
+                        val.LSma = 0;
+
+                    //Calculate SSma
+                    int i = 0;
+                    int count;
+                    tmp = 0;
+                    if (tradeBarHistory.Count() - WD2 > 0)
                     {
-                        val.LSma.Update(tradeBar.EndTime, tradeBar.Close);
-                        val.SSma.Update(tradeBar.EndTime, tradeBar.Close);
+                        i = tradeBarHistory.Count() - WD2;
+                        count = WD2;
                     }
-                    var tmp = tradeBarHistory.ElementAt(HS - 1).Close - tradeBarHistory.ElementAt(HS - 1 - WD1).Close;
+                    else
+                        count = tradeBarHistory.Count();
+                    for (int j = i; j < tradeBarHistory.Count(); j++)
+                        tmp = tmp + tradeBarHistory.ElementAt(j).Close;
+                    if (count > 0)
+                        val.SSma = tmp / count;
+                    else
+                        val.SSma = 0;
+
+                    //System.Console.WriteLine("Count: " + tradeBarHistory.Count()); 
+                    if (tradeBarHistory.Count() > 0)
+                        if (tradeBarHistory.Count() - 1 - WD1 >= 0)
+                            tmp = tradeBarHistory.ElementAt(tradeBarHistory.Count() - 1).Close
+                                - tradeBarHistory.ElementAt(tradeBarHistory.Count() - 1 - WD1).Close;
+                        else
+                            tmp = tradeBarHistory.ElementAt(tradeBarHistory.Count() - 1).Close
+                                - tradeBarHistory.ElementAt(0).Close;
+                    else
+                        tmp = 0;
                     val.Return = tmp;
                     ranks.Add(val);
                     ready = val.IsReady;
@@ -84,7 +115,7 @@ namespace QuantConnect.Algorithm.CSharp
 
                 if (!ready)
                     return;
- 
+
                 ranks.Sort(delegate (SymbolData x, SymbolData y) { return y.CompareTo(x); });
 
                 for (int i = 0; i < ranks.Count; i++)
@@ -98,8 +129,6 @@ namespace QuantConnect.Algorithm.CSharp
                 }
 
                 reweight();
-
- //               SetWarmup(TimeSpan.FromDays(HS));
             });
         }
 
@@ -108,14 +137,14 @@ namespace QuantConnect.Algorithm.CSharp
             _sd.Clear();
 
             //Add individual stocks.
-            //AddEquity("AAPL", Resolution.Second, Market.USA);
-            //AddEquity("MSFT", Resolution.Second, Market.USA);
-            //AddEquity("INTC", Resolution.Second, Market.USA);
-            //AddEquity("AMZN", Resolution.Second, Market.USA);
-            //AddEquity("GOOGL", Resolution.Second, Market.USA);
-            AddEquity("SPY", Resolution.Second, Market.USA);
-            AddEquity("IBM", Resolution.Second, Market.USA);
-            AddEquity("BAC", Resolution.Second, Market.USA);
+            AddEquity("AAPL", Resolution.Second, Market.USA);
+            AddEquity("MSFT", Resolution.Second, Market.USA);
+            AddEquity("INTC", Resolution.Second, Market.USA);
+            AddEquity("AMZN", Resolution.Second, Market.USA);
+            AddEquity("GOOGL", Resolution.Second, Market.USA);
+            //AddEquity("SPY", Resolution.Second, Market.USA);
+            //AddEquity("IBM", Resolution.Second, Market.USA);
+            //AddEquity("BAC", Resolution.Second, Market.USA);
 
             foreach (var security in Securities)
             {
@@ -155,14 +184,14 @@ namespace QuantConnect.Algorithm.CSharp
                 get { return Security.Holdings.Quantity; }
             }
 
-            public SimpleMovingAverage LSma;
-            public SimpleMovingAverage SSma;
+            public decimal LSma;
+            public decimal SSma;
             public readonly Identity Close;
             public decimal Return;
             public decimal wt;
             public decimal orders;
 
-           private readonly Mebane _algorithm;
+            private readonly Mebane _algorithm;
 
             public SymbolData(Symbol symbol, Mebane algorithm)
             {
@@ -170,15 +199,13 @@ namespace QuantConnect.Algorithm.CSharp
                 Security = algorithm.Securities[symbol];
 
                 Close = algorithm.Identity(symbol);
-                LSma = new SimpleMovingAverage(HS);
-                SSma = new SimpleMovingAverage(WD2);
 
                 _algorithm = algorithm;
             }
 
             public bool IsReady
             {
-                get { return Close.IsReady && LSma.IsReady & LSma.IsReady; }
+                get { return Close.IsReady; }
             }
 
             public int CompareTo(object obj)
