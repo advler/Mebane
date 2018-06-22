@@ -1,15 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Collections;
 
-using QuantConnect.Securities.Equity;
 using QuantConnect.Indicators;
 using QuantConnect.Securities;
-using QuantConnect.Data;
 using QuantConnect.Data.Market;
+using QuantConnect.Brokerages;
 
 //Mebane Faber Relative Strength Strategy with MA Rule
 //This is a synthesis of two methods
@@ -39,10 +35,10 @@ namespace QuantConnect.Algorithm.CSharp
         //const values
         private const decimal TOTALCASH = 10000;                //总资金
         private const decimal LEVERAGE = 1.0M;
-        private const int TOP_K = 3;
+        private const int TOP_K = 3;                            //TOP_K > 0
         private const int HS = 280;                             //history span
         private const int WD1 = 61;                              //days of window1
-        private const int WD2 = 20;                              //days of window2
+        private const int WD2 = 25;                              //days of window2
         //private const int HS = 2;                             //history span
         //private const int WD1 = 1;                              //days of window1
         //private const int WD2 = 1;                              //days of window2
@@ -53,28 +49,39 @@ namespace QuantConnect.Algorithm.CSharp
         public override void Initialize()
         {
             //set trade period
-            SetStartDate(2009, 5, 31);  //Set Start Date
-            SetEndDate(2018, 5, 31);    //Set End Date
+            SetStartDate(2010, 6, 1);  //Set Start Date
+            SetEndDate(2018, 6, 1);    //Set End Date
 
             //设置总资金
             SetCash(TOTALCASH);             //Set Strategy Cash
 
+            SetBrokerageModel(BrokerageName.InteractiveBrokersBrokerage, AccountType.Margin);
+
             //select stocks to be traded.
             stockSelection();
 
-            Schedule.On(DateRules.EveryDay(), TimeRules.At(9, 35), () =>
+            Schedule.On(DateRules.EveryDay(), TimeRules.At(9, 30), () =>
             {
                 List<SymbolData> ranks = new List<SymbolData>();
-                Boolean ready = true;
                 decimal tmp = 0;
 
                 foreach (var val in _sd.Values)
                 {
+                    if (!val.IsReady || !val.Security.Exchange.DateIsOpen(Time))
+                        continue;
+
+                    Transactions.CancelOpenOrders(val.Symbol);      //close all open orders at the daily beginning
+
                     var tradeBarHistory = History<TradeBar>(val.Symbol, TimeSpan.FromDays(HS), Resolution.Daily);
 
                     //Calculate LSma
                     foreach (TradeBar tradeBar in tradeBarHistory)
+                    {
                         tmp = tmp + tradeBar.Close;
+
+                        //val.LSma.Update(tradeBar.EndTime, tradeBar.Close);
+                        //val.SSma.Update(tradeBar.EndTime, tradeBar.Close);
+                    }
                     if (tradeBarHistory.Count() > 0)
                         val.LSma = tmp / tradeBarHistory.Count();
                     else
@@ -110,10 +117,9 @@ namespace QuantConnect.Algorithm.CSharp
                         tmp = 0;
                     val.Return = tmp;
                     ranks.Add(val);
-                    ready = val.IsReady;
                 }
 
-                if (!ready)
+                if (ranks.Count < 1)
                     return;
 
                 ranks.Sort(delegate (SymbolData x, SymbolData y) { return y.CompareTo(x); });
@@ -142,9 +148,8 @@ namespace QuantConnect.Algorithm.CSharp
             AddEquity("INTC", Resolution.Second, Market.USA);
             AddEquity("AMZN", Resolution.Second, Market.USA);
             AddEquity("GOOGL", Resolution.Second, Market.USA);
-            //AddEquity("SPY", Resolution.Second, Market.USA);
-            //AddEquity("IBM", Resolution.Second, Market.USA);
-            //AddEquity("BAC", Resolution.Second, Market.USA);
+            AddEquity("FB", Resolution.Second, Market.USA);
+            AddEquity("BABA", Resolution.Second, Market.USA);
 
             foreach (var security in Securities)
             {
@@ -155,14 +160,22 @@ namespace QuantConnect.Algorithm.CSharp
         private void reweight()
         {
             decimal liquidity = Portfolio.TotalHoldingsValue + Portfolio.Cash;
+
+            if (liquidity <= 0)
+                return;
+
             decimal pct_diff = 0;
 
             foreach (var val in _sd.Values)
             {
-                decimal target = liquidity * val.wt / val.Security.High;
+                decimal target;
+                if (val.Security.High > 0)
+                    target = liquidity * val.wt / val.Security.High;
+                else
+                    target = 0;
                 decimal current = Portfolio[val.Symbol].Quantity;
                 val.orders = target - current;
-                pct_diff += val.orders * val.Security.High / liquidity;
+                pct_diff += Math.Abs(val.orders * val.Security.High / liquidity);
             }
 
             if (pct_diff > MIN_PCT_DIFF)
