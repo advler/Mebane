@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using NodaTime;
 
 using QuantConnect.Indicators;
 using QuantConnect.Securities;
@@ -55,12 +56,14 @@ namespace QuantConnect.Algorithm.CSharp
             //设置总资金
             SetCash(TOTALCASH);             //Set Strategy Cash
 
-            SetBrokerageModel(BrokerageName.InteractiveBrokersBrokerage, AccountType.Margin);
+            SetBrokerageModel(BrokerageName.InteractiveBrokersBrokerage, AccountType.Cash);
 
             //select stocks to be traded.
             stockSelection();
 
-            Schedule.On(DateRules.EveryDay(), TimeRules.At(9, 30), () =>
+            DateTimeZone TimeZone = DateTimeZoneProviders.Tzdb["America/New_York"];
+
+            Schedule.On(DateRules.EveryDay(), TimeRules.At(9, 35, TimeZone), () =>
             {
                 List<SymbolData> ranks = new List<SymbolData>();
                 decimal tmp = 0;
@@ -143,13 +146,13 @@ namespace QuantConnect.Algorithm.CSharp
             _sd.Clear();
 
             //Add individual stocks.
-            AddEquity("AAPL", Resolution.Second, Market.USA);
-            AddEquity("MSFT", Resolution.Second, Market.USA);
-            AddEquity("INTC", Resolution.Second, Market.USA);
-            AddEquity("AMZN", Resolution.Second, Market.USA);
-            AddEquity("GOOGL", Resolution.Second, Market.USA);
-            AddEquity("FB", Resolution.Second, Market.USA);
-            AddEquity("BABA", Resolution.Second, Market.USA);
+            AddEquity("AAPL", Resolution.Daily, Market.USA);
+            AddEquity("MSFT", Resolution.Daily, Market.USA);
+            AddEquity("INTC", Resolution.Daily, Market.USA);
+            AddEquity("AMZN", Resolution.Daily, Market.USA);
+            AddEquity("GOOGL", Resolution.Daily, Market.USA);
+            AddEquity("FB", Resolution.Daily, Market.USA);
+            AddEquity("BABA", Resolution.Daily, Market.USA);
 
             foreach (var security in Securities)
             {
