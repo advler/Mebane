@@ -34,7 +34,7 @@ namespace QuantConnect.Algorithm.CSharp
     class Mebane : QCAlgorithm
     {
         //const values
-        private const decimal TOTALCASH = 10000;                //总资金
+        private const decimal TOTALCASH = 10000;                //total capital
         private const decimal LEVERAGE = 1.0M;
         private const int TOP_K = 3;                            //TOP_K > 0
         private const int HS = 280;                             //history span
@@ -53,7 +53,7 @@ namespace QuantConnect.Algorithm.CSharp
             SetStartDate(2010, 6, 1);  //Set Start Date
             SetEndDate(2018, 6, 1);    //Set End Date
 
-            //设置总资金
+            //set total capital
             SetCash(TOTALCASH);             //Set Strategy Cash
 
             SetBrokerageModel(BrokerageName.InteractiveBrokersBrokerage, AccountType.Cash);
