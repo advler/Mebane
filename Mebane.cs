@@ -63,7 +63,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             DateTimeZone TimeZone = DateTimeZoneProviders.Tzdb["America/New_York"];
 
-            Schedule.On(DateRules.EveryDay(), TimeRules.At(9, 35, TimeZone), () =>
+            Schedule.On(DateRules.EveryDay(), TimeRules.At(9, 40, TimeZone), () =>
             {
                 List<SymbolData> ranks = new List<SymbolData>();
                 decimal tmp = 0;
@@ -146,13 +146,13 @@ namespace QuantConnect.Algorithm.CSharp
             _sd.Clear();
 
             //Add individual stocks.
-            AddEquity("AAPL", Resolution.Daily, Market.USA);
-            AddEquity("MSFT", Resolution.Daily, Market.USA);
-            AddEquity("INTC", Resolution.Daily, Market.USA);
-            AddEquity("AMZN", Resolution.Daily, Market.USA);
-            AddEquity("GOOGL", Resolution.Daily, Market.USA);
-            AddEquity("FB", Resolution.Daily, Market.USA);
-            AddEquity("BABA", Resolution.Daily, Market.USA);
+            AddEquity("AAPL", Resolution.Minute, Market.USA);
+            AddEquity("MSFT", Resolution.Minute, Market.USA);
+            AddEquity("INTC", Resolution.Minute, Market.USA);
+            AddEquity("AMZN", Resolution.Minute, Market.USA);
+            AddEquity("GOOGL", Resolution.Minute, Market.USA);
+            AddEquity("FB", Resolution.Minute, Market.USA);
+            AddEquity("BABA", Resolution.Minute, Market.USA);
 
             foreach (var security in Securities)
             {
