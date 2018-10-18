@@ -91,7 +91,7 @@ namespace QuantConnect.Algorithm.CSharp
                     if (tradeBarHistory.Count() > 0)
                         val.LSma = tmp / tradeBarHistory.Count();
                     else
-                        val.LSma = 0;
+                        continue;
 
                     //Calculate SSma
                     int i = 0;
@@ -106,21 +106,16 @@ namespace QuantConnect.Algorithm.CSharp
                         count = tradeBarHistory.Count();
                     for (int j = i; j < tradeBarHistory.Count(); j++)
                         tmp = tmp + tradeBarHistory.ElementAt(j).Close;
-                    if (count > 0)
-                        val.SSma = tmp / count;
-                    else
-                        val.SSma = 0;
+                    val.SSma = tmp / count;
 
                     //System.Console.WriteLine("Count: " + tradeBarHistory.Count()); 
-                    if (tradeBarHistory.Count() > 0)
-                        if (tradeBarHistory.Count() - 1 - WD1 >= 0)
-                            tmp = tradeBarHistory.ElementAt(tradeBarHistory.Count() - 1).Close
-                                - tradeBarHistory.ElementAt(tradeBarHistory.Count() - 1 - WD1).Close;
-                        else
-                            tmp = tradeBarHistory.ElementAt(tradeBarHistory.Count() - 1).Close
-                                - tradeBarHistory.ElementAt(0).Close;
+
+                    if (tradeBarHistory.Count() - 1 - WD1 >= 0)
+                        tmp = tradeBarHistory.ElementAt(tradeBarHistory.Count() - 1).Close
+                            - tradeBarHistory.ElementAt(tradeBarHistory.Count() - 1 - WD1).Close;
                     else
-                        tmp = 0;
+                        tmp = tradeBarHistory.ElementAt(tradeBarHistory.Count() - 1).Close
+                            - tradeBarHistory.ElementAt(0).Close;
                     val.Return = tmp;
                     ranks.Add(val);
                 }
@@ -137,7 +132,7 @@ namespace QuantConnect.Algorithm.CSharp
                         ranks.ElementAt(i).wt = 0;
                 }
 
-                reweight();
+                reweight(ranks);
             });
         }
 
@@ -160,7 +155,7 @@ namespace QuantConnect.Algorithm.CSharp
             }
         }
 
-        private void reweight()
+        private void reweight(List<SymbolData> ranks)
         {
             decimal liquidity = Portfolio.TotalHoldingsValue + Portfolio.Cash;
 
@@ -169,7 +164,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             decimal pct_diff = 0;
 
-            foreach (var val in _sd.Values)
+            foreach (var val in ranks)
             {
                 decimal target;
                 if (val.Security.Close > 0)
@@ -183,7 +178,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             if (pct_diff > MIN_PCT_DIFF)
             {
-                foreach (var val in _sd.Values)
+                foreach (var val in ranks)
                 {
                     MarketOrder(val.Symbol, val.orders);
                 }
