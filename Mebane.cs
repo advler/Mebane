@@ -45,7 +45,8 @@ namespace QuantConnect.Algorithm.CSharp
         //private const int WD2 = 1;                              //days of window2
         private const decimal MIN_PCT_DIFF = 0.1M;
 
-        private readonly Dictionary<Symbol, SymbolData> _sd = new Dictionary<Symbol, SymbolData>();      //portfolio corresponding dic
+        //portfolio corresponding dic
+        private readonly Dictionary<Symbol, SymbolData> _sd = new Dictionary<Symbol, SymbolData>();
 
         public override void Initialize()
         {
@@ -70,10 +71,14 @@ namespace QuantConnect.Algorithm.CSharp
 
                 foreach (var val in _sd.Values)
                 {
-                    if (!val.IsReady || !val.Security.Exchange.DateIsOpen(Time))
+                    if (!val.Security.Exchange.DateIsOpen(Time))
                         continue;
-
-                    Transactions.CancelOpenOrders(val.Symbol);      //close all open orders at the daily beginning
+                    else
+                    {
+                        Transactions.CancelOpenOrders(val.Symbol);      //close all open orders at the daily beginning
+                        if (!val.IsReady)
+                            continue;
+                    }
 
                     var tradeBarHistory = History<TradeBar>(val.Symbol, TimeSpan.FromDays(HS), Resolution.Daily);
 
@@ -81,9 +86,7 @@ namespace QuantConnect.Algorithm.CSharp
                     foreach (TradeBar tradeBar in tradeBarHistory)
                     {
                         tmp = tmp + tradeBar.Close;
-
-                        //val.LSma.Update(tradeBar.EndTime, tradeBar.Close);
-                        //val.SSma.Update(tradeBar.EndTime, tradeBar.Close);
+                        Debug("His_bar time: " + tradeBar.Time);
                     }
                     if (tradeBarHistory.Count() > 0)
                         val.LSma = tmp / tradeBarHistory.Count();
@@ -121,9 +124,6 @@ namespace QuantConnect.Algorithm.CSharp
                     val.Return = tmp;
                     ranks.Add(val);
                 }
-
-                if (ranks.Count < 1)
-                    return;
 
                 ranks.Sort(delegate (SymbolData x, SymbolData y) { return y.CompareTo(x); });
 
@@ -172,13 +172,13 @@ namespace QuantConnect.Algorithm.CSharp
             foreach (var val in _sd.Values)
             {
                 decimal target;
-                if (val.Security.High > 0)
-                    target = liquidity * val.wt / val.Security.High;
+                if (val.Security.Close > 0)
+                    target = liquidity * val.wt / val.Security.Close;
                 else
                     target = 0;
                 decimal current = Portfolio[val.Symbol].Quantity;
                 val.orders = target - current;
-                pct_diff += Math.Abs(val.orders * val.Security.High / liquidity);
+                pct_diff += Math.Abs(val.orders * val.Security.Close / liquidity);
             }
 
             if (pct_diff > MIN_PCT_DIFF)
