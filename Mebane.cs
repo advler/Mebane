@@ -86,7 +86,7 @@ namespace QuantConnect.Algorithm.CSharp
                     foreach (TradeBar tradeBar in tradeBarHistory)
                     {
                         tmp = tmp + tradeBar.Close;
-                        Debug("His_bar time: " + tradeBar.Time);
+                        //Debug("His_bar time: " + tradeBar.Time);
                     }
                     if (tradeBarHistory.Count() > 0)
                         val.LSma = tmp / tradeBarHistory.Count();
