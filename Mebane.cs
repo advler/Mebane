@@ -51,7 +51,7 @@ namespace QuantConnect.Algorithm.CSharp
         public override void Initialize()
         {
             //set trade period
-            SetStartDate(2010, 6, 1);  //Set Start Date
+            SetStartDate(2014, 6, 1);  //Set Start Date
             SetEndDate(2018, 6, 1);    //Set End Date
 
             //set total capital
@@ -132,7 +132,7 @@ namespace QuantConnect.Algorithm.CSharp
                         ranks.ElementAt(i).wt = 0;
                 }
 
-                reweight(ranks);
+                reweight();
             });
         }
 
@@ -155,7 +155,7 @@ namespace QuantConnect.Algorithm.CSharp
             }
         }
 
-        private void reweight(List<SymbolData> ranks)
+        private void reweight()
         {
             decimal liquidity = Portfolio.TotalHoldingsValue + Portfolio.Cash;
 
@@ -164,7 +164,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             decimal pct_diff = 0;
 
-            foreach (var val in ranks)
+            foreach (var val in _sd.Values)
             {
                 decimal target;
                 if (val.Security.Close > 0)
@@ -178,7 +178,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             if (pct_diff > MIN_PCT_DIFF)
             {
-                foreach (var val in ranks)
+                foreach (var val in _sd.Values)
                 {
                     MarketOrder(val.Symbol, val.orders);
                 }
