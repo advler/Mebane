@@ -132,7 +132,7 @@ namespace QuantConnect.Algorithm.CSharp
                         ranks.ElementAt(i).wt = 0;
                 }
 
-                reweight();
+                reweight(ranks);
             });
         }
 
@@ -155,7 +155,7 @@ namespace QuantConnect.Algorithm.CSharp
             }
         }
 
-        private void reweight()
+        private void reweight(List<SymbolData> ranks)
         {
             decimal liquidity = Portfolio.TotalHoldingsValue + Portfolio.Cash;
 
@@ -164,7 +164,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             decimal pct_diff = 0;
 
-            foreach (var val in _sd.Values)
+            foreach (var val in ranks)
             {
                 decimal target;
                 if (val.Security.Close > 0)
@@ -178,7 +178,7 @@ namespace QuantConnect.Algorithm.CSharp
 
             if (pct_diff > MIN_PCT_DIFF)
             {
-                foreach (var val in _sd.Values)
+                foreach (var val in ranks)
                 {
                     MarketOrder(val.Symbol, val.orders);
                 }
