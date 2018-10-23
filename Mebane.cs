@@ -44,6 +44,7 @@ namespace QuantConnect.Algorithm.CSharp
         //private const int WD1 = 1;                              //days of window1
         //private const int WD2 = 1;                              //days of window2
         private const decimal MIN_PCT_DIFF = 0.1M;
+        private const decimal ZERO = 0.0001M;                     //Replacement of 0
 
         //portfolio corresponding dic
         private readonly Dictionary<Symbol, SymbolData> _sd = new Dictionary<Symbol, SymbolData>();
@@ -110,12 +111,25 @@ namespace QuantConnect.Algorithm.CSharp
 
                     //System.Console.WriteLine("Count: " + tradeBarHistory.Count()); 
 
-                    if (tradeBarHistory.Count() - 1 - WD1 >= 0)
+                    if (tradeBarHistory.Count() - WD1 > 0)
+                    {
                         tmp = tradeBarHistory.ElementAt(tradeBarHistory.Count() - 1).Close
                             - tradeBarHistory.ElementAt(tradeBarHistory.Count() - 1 - WD1).Close;
+                        if (tradeBarHistory.ElementAt(tradeBarHistory.Count() - 1 - WD1).Close > 0)
+                            tmp = tmp /
+                                tradeBarHistory.ElementAt(tradeBarHistory.Count() - 1 - WD1).Close;
+                        else
+                            tmp = tmp / ZERO;
+                    }
                     else
+                    {
                         tmp = tradeBarHistory.ElementAt(tradeBarHistory.Count() - 1).Close
                             - tradeBarHistory.ElementAt(0).Close;
+                        if (tradeBarHistory.ElementAt(0).Close > 0)
+                            tmp = tmp / tradeBarHistory.ElementAt(0).Close;
+                        else
+                            tmp = tmp / ZERO;
+                    }
                     val.Return = tmp;
                     ranks.Add(val);
                 }
@@ -166,21 +180,21 @@ namespace QuantConnect.Algorithm.CSharp
 
             foreach (var val in ranks)
             {
+                decimal current = Portfolio[val.Symbol].Quantity;
                 decimal target;
                 if (val.Security.Close > 0)
                     target = liquidity * val.wt / val.Security.Close;
                 else
-                    target = 0;
-                decimal current = Portfolio[val.Symbol].Quantity;
-                val.orders = target - current;
-                pct_diff += Math.Abs(val.orders * val.Security.Close / liquidity);
+                    target = current;
+                val.order = target - current;
+                pct_diff += Math.Abs(val.order * val.Security.Close / liquidity);
             }
 
             if (pct_diff > MIN_PCT_DIFF)
             {
                 foreach (var val in ranks)
                 {
-                    MarketOrder(val.Symbol, val.orders);
+                    MarketOrder(val.Symbol, val.order);
                 }
             }
         }
@@ -200,7 +214,7 @@ namespace QuantConnect.Algorithm.CSharp
             public readonly Identity Close;
             public decimal Return;
             public decimal wt;
-            public decimal orders;
+            public decimal order;
 
             private readonly Mebane _algorithm;
 
